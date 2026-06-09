@@ -9,6 +9,8 @@ dependencies = [
     "pydantic==2.13.4",
     "pillow==12.2.0",
     "requests==2.34.2",
+    "modal>=1.4.3",
+    "ipython>=9.14.1",
 ]
 
 [project.optional-dependencies]
