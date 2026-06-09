@@ -111,6 +111,79 @@ function IdleView({ onPick, onUpload }) {
 
 const SHOT_IMG_STYLE = { width: "100%", height: "100%", objectFit: "contain", display: "block" };
 
+// ── Export helpers (client-side, so they work for examples and live uploads
+// alike — the report payload is already in the browser) ──
+function severityLabel(s) {
+  return (window.SEVERITY && SEVERITY[s] && SEVERITY[s].label) || (s ? s[0].toUpperCase() + s.slice(1) : s);
+}
+
+function toJira(e) {
+  const L = [
+    `h2. ${e.title}`, "",
+    `*Severity:* ${severityLabel(e.severity)} — ${e.severityWhy}`,
+    `*Component:* ${e.app}`, "",
+    "h3. Summary", e.summary, "",
+    "h3. Steps to Reproduce",
+  ];
+  e.steps.forEach((s) => L.push(`# ${s}`));
+  L.push("", "h3. Expected", e.expected, "", "h3. Actual", e.actual, "", "h3. Environment");
+  e.env.forEach((r) => L.push(`* ${r.k}: ${r.v}${r.known ? "" : " _(unconfirmed)_"}`));
+  L.push("", "h3. Missing Info (confirm before filing)");
+  e.missing.forEach((m) => L.push(`* ${m.q} — ${m.why}`));
+  L.push("", "h3. Regression Tests");
+  e.tests.forEach((t) => L.push(`* ${t.id} ${t.title}: given ${t.given}, when ${t.when}, then ${t.then}`));
+  L.push("", "h3. Edge Cases");
+  e.edges.forEach((c) => L.push(`* ${c.t}: ${c.d}`));
+  return L.join("\n");
+}
+
+function toGithub(e) {
+  const L = [
+    `# ${e.title}`, "",
+    `**Severity:** ${severityLabel(e.severity)} — ${e.severityWhy}  `,
+    `**Component:** ${e.app}`, "",
+    "## Summary", e.summary, "",
+    "## Steps to Reproduce",
+  ];
+  e.steps.forEach((s, i) => L.push(`${i + 1}. ${s}`));
+  L.push("", "## Expected", e.expected, "", "## Actual", e.actual, "",
+    "## Environment", "", "| Field | Value | Confirmed |", "| --- | --- | --- |");
+  e.env.forEach((r) => L.push(`| ${r.k} | ${r.v} | ${r.known ? "yes" : "no"} |`));
+  L.push("", "## Missing Info (confirm before filing)");
+  e.missing.forEach((m) => L.push(`- [ ] **${m.q}** — ${m.why}`));
+  L.push("", "## Regression Tests");
+  e.tests.forEach((t) => {
+    L.push(`- **${t.id} ${t.title}**`, `  - _Given_ ${t.given}`, `  - _When_ ${t.when}`, `  - _Then_ ${t.then}`);
+  });
+  L.push("", "## Edge Cases");
+  e.edges.forEach((c) => L.push(`- **${c.t}** — ${c.d}`));
+  return L.join("\n");
+}
+
+function csvCell(v) {
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function toCsv(e) {
+  const rows = [["id", "title", "given", "when", "then"]];
+  e.tests.forEach((t) => rows.push([t.id, t.title, t.given, t.when, t.then]));
+  return rows.map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
+}
+
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+  return Promise.reject(new Error("clipboard unavailable"));
+}
+
+function downloadText(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 // ── Loading ──
 function LoadingView({ shotUrl, mockId, fileName, stageIdx }) {
   return (
@@ -200,9 +273,16 @@ function ResultsView({ example, shotUrl, fileName, layout, showVision, onReset, 
 
         <div className="bl-export">
           <span className="bl-export-l">Export</span>
-          <Btn kind="primary" icon="↗" onClick={() => push("Sent to Jira — JIRA-4821 created (demo)")}>Create Jira issue</Btn>
-          <Btn kind="ghost" icon="⌥" onClick={() => push("Opened GitHub issue draft (demo)")}>GitHub issue</Btn>
-          <Btn kind="ghost" icon="▤" onClick={() => push("Downloaded buglens-report.csv (demo)")}>CSV</Btn>
+          <Btn kind="primary" icon="↗"
+            onClick={() => copyText(toJira(example))
+              .then(() => push("Copied Jira markdown to clipboard"))
+              .catch(() => push("Couldn’t access the clipboard"))}>Copy Jira</Btn>
+          <Btn kind="ghost" icon="⌥"
+            onClick={() => copyText(toGithub(example))
+              .then(() => push("Copied GitHub issue to clipboard"))
+              .catch(() => push("Couldn’t access the clipboard"))}>Copy GitHub issue</Btn>
+          <Btn kind="ghost" icon="▤"
+            onClick={() => { downloadText("buglens-tests.csv", toCsv(example), "text/csv"); push("Downloaded buglens-tests.csv"); }}>Download CSV</Btn>
         </div>
       </main>
     </div>
