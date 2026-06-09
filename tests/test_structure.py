@@ -6,10 +6,19 @@ import pytest
 
 from buglens import structure
 from buglens.examples import EXAMPLES
+from buglens.prompts import STRUCTURE_PROMPT
 from buglens.schema import BugReport
 
 # Field-name JSON (model_dump default) is exactly what the model is asked to emit.
 VALID_JSON = json.dumps(EXAMPLES["payment"].model_dump())
+
+
+def test_structure_prompt_enforces_quality_floors() -> None:
+    # Guard the hardening rules so they can't silently regress.
+    assert "Never claim data loss" in STRUCTURE_PROMPT
+    assert 'critical" ONLY' in STRUCTURE_PROMPT
+    assert "missing_info is the most important field" in STRUCTURE_PROMPT
+    assert STRUCTURE_PROMPT.count("at least 3") >= 2  # regression_tests and edge_cases
 
 
 def test_extract_json_strips_fences_and_prose() -> None:

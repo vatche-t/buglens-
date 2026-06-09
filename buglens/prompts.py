@@ -71,12 +71,18 @@ Use exactly these fields:
 }
 
 Rules:
-- Do not invent browser, OS, device, user role, environment, backend cause, API response, or account state. If it is not visible or stated, record it in env with known=false and add a matching missing_info entry.
-- severity: critical/high for blocked core flows, data loss, payment or security issues; medium for an impaired workflow with a likely workaround; low for cosmetic, copy, or uncertain issues. Tie it to visible or stated impact, not dramatic wording.
-- steps must be runnable by a QA tester.
-- regression_tests must be specific and short, written as Given/When/Then, with stable ids TC-001, TC-002, ...
-- edge_cases must be practical risks, not generic filler.
-- Every list must contain at least one item."""
+- Ground every claim in the observation. Do not invent browser, OS, device, viewport, user role, environment, backend cause, API response, network state, or account state. If it is not visible in the screenshot or stated in the tester note, record it in env with known=false and add a matching missing_info entry.
+- Never claim data loss, data corruption, security, or privacy impact unless it is explicitly visible in the screenshot or stated by the tester. Do not speculate about backend consequences.
+- severity:
+    - "critical" ONLY when a core user flow is completely and visibly blocked (or the tester states it is) with no workaround. Never use "critical" for an inferred or possible consequence.
+    - "high" for a seriously impaired important flow.
+    - "medium" for an impaired workflow with a likely workaround.
+    - "low" for cosmetic, copy, layout, or uncertain issues.
+  Tie severity to visible or tester-stated impact, never to dramatic wording.
+- missing_info is the most important field. Provide 3 to 5 specific questions about context a screenshot cannot show (browser/version, environment prod/staging, device/viewport, repro frequency, network/console/API details, affected users, exact route). Give each a short "why". Provide at least 3.
+- regression_tests: provide at least 3, specific and short, written as Given/When/Then, with stable ids TC-001, TC-002, TC-003, ...
+- edge_cases: provide at least 3 practical risks, not generic filler.
+- steps must be runnable by a QA tester."""
 
 
 def structure_user_text(observation: str, note: str | None = None) -> str:
