@@ -6,7 +6,6 @@ import os
 from dataclasses import dataclass
 from enum import StrEnum
 
-
 DEFAULT_MODEL_ID = "openbmb/MiniCPM-V-4.6"
 
 
