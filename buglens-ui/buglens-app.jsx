@@ -51,7 +51,13 @@ function Header({ onReset, view }) {
 }
 
 // ── Idle / upload + gallery ──
-function IdleView({ onPick, onUpload }) {
+const NOTE_INPUT_STYLE = {
+  width: "100%", marginTop: 12, padding: "10px 12px",
+  background: "var(--surface-2)", border: "1px solid var(--border)",
+  borderRadius: 10, color: "var(--text)", font: "inherit", outline: "none",
+};
+
+function IdleView({ onPick, onUpload, note, onNoteChange }) {
   const inputRef = React.useRef(null);
   const handleFiles = (files) => { if (files && files[0]) onUpload(files[0]); };
   const onDrop = (ev) => { ev.preventDefault(); handleFiles(ev.dataTransfer.files); };
@@ -81,6 +87,14 @@ function IdleView({ onPick, onUpload }) {
             onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
           />
         </div>
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => onNoteChange(e.target.value)}
+          placeholder="Optional: one-line tester note (e.g. “Pay button does nothing”)"
+          style={NOTE_INPUT_STYLE}
+          aria-label="Tester note"
+        />
       </div>
 
       <div className="bl-gallery">
@@ -297,6 +311,7 @@ function App() {
   const [report, setReport] = React.useState(null); // structured result from the backend
   const [shotUrl, setShotUrl] = React.useState(null); // object URL of an uploaded screenshot
   const [uploadName, setUploadName] = React.useState("");
+  const [note, setNote] = React.useState(""); // optional tester note sent with uploads
   const [stageIdx, setStageIdx] = React.useState(0);
   const [toasts, push] = useToasts();
   const timers = React.useRef([]);
@@ -354,6 +369,7 @@ function App() {
     setStageIdx(0);
     setView("loading");
     const token = ++reqRef.current;
+    const testerNote = note.trim();
     // Advance the visual stages but keep the last one active until the result lands.
     let acc = 0;
     LOAD_STAGES.forEach((s, i) => {
@@ -365,7 +381,7 @@ function App() {
       .then((image_b64) => fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_b64, note: "" }),
+        body: JSON.stringify({ image_b64, note: testerNote }),
       }))
       .then(async (r) => {
         if (!r.ok) {
@@ -393,6 +409,7 @@ function App() {
     reqRef.current++; // invalidate any in-flight request
     clearShot();
     setUploadName("");
+    setNote("");
     setView("idle");
     setActiveId(null);
     setReport(null);
@@ -408,7 +425,9 @@ function App() {
          style={{ "--accent": accent }}>
       <Header onReset={reset} view={view} />
       <div className="bl-stage-wrap">
-        {view === "idle" && <IdleView onPick={pick} onUpload={analyzeUpload} />}
+        {view === "idle" && (
+          <IdleView onPick={pick} onUpload={analyzeUpload} note={note} onNoteChange={setNote} />
+        )}
         {view === "loading" && (shotUrl || example) && (
           <LoadingView shotUrl={shotUrl} mockId={activeId}
                        fileName={shotUrl ? uploadName : example && example.captured}
