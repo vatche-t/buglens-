@@ -1,0 +1,85 @@
+"""Tests for the structuring call: parsing, validation, retry, and failure."""
+
+import json
+
+import pytest
+
+from buglens import structure
+from buglens.examples import EXAMPLES
+from buglens.schema import BugReport
+
+# Field-name JSON (model_dump default) is exactly what the model is asked to emit.
+VALID_JSON = json.dumps(EXAMPLES["payment"].model_dump())
+
+
+def test_extract_json_strips_fences_and_prose() -> None:
+    fenced = "```json\n{\"a\": 1}\n```"
+    assert structure.extract_json(fenced) == '{"a": 1}'
+
+    chatty = 'Sure! Here you go:\n{"a": 1}\nHope that helps.'
+    assert structure.extract_json(chatty) == '{"a": 1}'
+
+
+def test_extract_json_raises_when_absent() -> None:
+    with pytest.raises(ValueError):
+        structure.extract_json("no json here")
+
+
+def test_parse_report_round_trips() -> None:
+    report = structure.parse_report(VALID_JSON)
+    assert isinstance(report, BugReport)
+    assert report.app == "Checkout"
+
+
+# ── fakes that return queued decode outputs ──
+class _FakeTensor:
+    shape = (1, 3)
+
+
+class _FakeInputs(dict):
+    def to(self, _device):
+        return self
+
+
+class _SeqProcessor:
+    def __init__(self, outputs):
+        self._outputs = list(outputs)
+        self.calls = 0
+
+    def apply_chat_template(self, messages, **kwargs):
+        self.last_messages = messages
+        return _FakeInputs(input_ids=_FakeTensor())
+
+    def decode(self, _ids, **kwargs):
+        out = self._outputs[self.calls]
+        self.calls += 1
+        return out
+
+
+class _FakeModel:
+    device = "cpu"
+
+    def generate(self, **kwargs):
+        return [[0, 1, 2, 3]]
+
+
+def test_structure_parses_on_first_try() -> None:
+    processor = _SeqProcessor([VALID_JSON])
+    report = structure.structure(_FakeModel(), processor, "obs", "note")
+    assert report.app == "Checkout"
+    assert processor.calls == 1  # no retry needed
+
+
+def test_structure_retries_once_then_succeeds() -> None:
+    processor = _SeqProcessor(["not json at all", VALID_JSON])
+    report = structure.structure(_FakeModel(), processor, "obs")
+    assert isinstance(report, BugReport)
+    assert processor.calls == 2  # retried exactly once
+
+
+def test_structure_raises_after_failed_retry() -> None:
+    processor = _SeqProcessor(["garbage", "{bad json"])
+    with pytest.raises(structure.StructureError) as exc:
+        structure.structure(_FakeModel(), processor, "obs")
+    assert processor.calls == 2
+    assert exc.value.raw == "{bad json"  # last raw output preserved for the UI
