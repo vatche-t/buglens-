@@ -40,6 +40,43 @@ def test_parse_report_round_trips() -> None:
     assert report.app == "Checkout"
 
 
+def test_fallback_report_preserves_quality_floors_without_overclaiming() -> None:
+    observation = """Visible facts:
+    - The screen is a checkout payment page.
+    - The card number field is filled.
+    - The Pay button appears disabled.
+
+    Not visible:
+    - Browser, OS, environment, API response, and affected users are not visible.
+    """
+    report = structure.fallback_report(
+        observation,
+        "Pay button stays disabled after entering a valid test card.",
+    )
+
+    assert report.severity.value == "high"
+    assert report.app == "Checkout"
+    assert len(report.missing_info) >= 3
+    assert len(report.regression_tests) >= 3
+    assert len(report.edge_cases) >= 3
+    assert len(report.vision_read) >= 3
+    no_overclaims = f"{report.summary} {report.severity_why}".lower()
+    assert "data loss" not in no_overclaims
+    assert "security" not in no_overclaims
+    assert "privacy" not in no_overclaims
+
+
+def test_fallback_report_stays_medium_when_impact_is_unclear() -> None:
+    report = structure.fallback_report(
+        "Visible facts:\n- A settings screen shows a blank panel.",
+        "",
+    )
+
+    assert report.severity.value == "medium"
+    assert report.app == "Application"
+    assert any(not item.known for item in report.env)
+
+
 # ── fakes that return queued decode outputs ──
 class _FakeTensor:
     shape = (1, 3)
