@@ -35,6 +35,16 @@ def test_analyze_returns_frontend_payload() -> None:
     assert body["edges"][0]["d"]
 
 
+def test_example_analyze_still_works_in_modal_mode(monkeypatch) -> None:
+    monkeypatch.setenv("BUGLENS_BACKEND", "modal")
+    monkeypatch.setenv("BUGLENS_MODAL_ENDPOINT", "https://x.modal.run")
+
+    resp = client.get("/api/analyze", params={"id": "payment"})
+
+    assert resp.status_code == 200
+    assert resp.json()["title"]
+
+
 def test_analyze_unknown_and_missing_id_404() -> None:
     assert client.get("/api/analyze", params={"id": "nope"}).status_code == 404
     assert client.get("/api/analyze").status_code == 404

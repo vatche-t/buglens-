@@ -39,19 +39,7 @@ server = Server(title="BugLens")
 
 
 def analyze(example_id: str | None = None) -> BugReport:
-    """Resolve a screenshot to a structured report.
-
-    Mock mode (current): look the report up from the built-in examples. The real
-    backends (Modal / ZeroGPU running MiniCPM-V 4.6) will replace this body while
-    keeping the same return contract.
-    """
-
-    settings = load_settings()
-    if settings.backend.value != "mock":  # pragma: no cover - real backends land later
-        raise HTTPException(
-            status_code=501,
-            detail=f"Backend '{settings.backend.value}' not wired yet.",
-        )
+    """Return a built-in example report for gallery clicks and exports."""
 
     report = get_example(example_id) if example_id else None
     if report is None:
