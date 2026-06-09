@@ -25,6 +25,16 @@ function useToasts() {
   return [toasts, push];
 }
 
+// Read a File into a bare base64 string (no data: prefix) for the JSON body.
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+    reader.onerror = () => reject(new Error("Could not read the file"));
+    reader.readAsDataURL(file);
+  });
+}
+
 // ── Header ──
 function Header({ onReset, view }) {
   return (
@@ -41,8 +51,10 @@ function Header({ onReset, view }) {
 }
 
 // ── Idle / upload + gallery ──
-function IdleView({ onPick }) {
-  const onDrop = (ev) => { ev.preventDefault(); onPick(EXAMPLES[0].id); };
+function IdleView({ onPick, onUpload }) {
+  const inputRef = React.useRef(null);
+  const handleFiles = (files) => { if (files && files[0]) onUpload(files[0]); };
+  const onDrop = (ev) => { ev.preventDefault(); handleFiles(ev.dataTransfer.files); };
   return (
     <div className="bl-idle">
       <div className="bl-hero">
@@ -56,11 +68,18 @@ function IdleView({ onPick }) {
           className="bl-drop"
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
-          onClick={() => onPick(EXAMPLES[0].id)}
+          onClick={() => inputRef.current && inputRef.current.click()}
         >
           <div className="bl-drop-ic">⤢</div>
           <div className="bl-drop-t">Drop a screenshot</div>
           <div className="bl-drop-s">PNG or JPG · or pick an example below</div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            style={{ display: "none" }}
+            onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
+          />
         </div>
       </div>
 
@@ -90,16 +109,20 @@ function IdleView({ onPick }) {
   );
 }
 
+const SHOT_IMG_STYLE = { width: "100%", height: "100%", objectFit: "contain", display: "block" };
+
 // ── Loading ──
-function LoadingView({ example, stageIdx }) {
+function LoadingView({ shotUrl, mockId, fileName, stageIdx }) {
   return (
     <div className="bl-loading">
       <div className="bl-loading-shot">
-        <MockScreen id={example.id} />
+        {shotUrl
+          ? <img style={SHOT_IMG_STYLE} src={shotUrl} alt="Uploaded screenshot" />
+          : <MockScreen id={mockId} />}
         <div className="bl-scan" />
       </div>
       <div className="bl-loading-side">
-        <div className="bl-load-file">{example.captured}</div>
+        <div className="bl-load-file">{fileName}</div>
         <ul className="bl-stages">
           {LOAD_STAGES.map((s, i) => {
             const state = i < stageIdx ? "done" : i === stageIdx ? "active" : "todo";
@@ -122,7 +145,7 @@ function LoadingView({ example, stageIdx }) {
 }
 
 // ── Results ──
-function ResultsView({ example, layout, showVision, onReset, push }) {
+function ResultsView({ example, shotUrl, fileName, layout, showVision, onReset, push }) {
   const cards = [
     <BugReportCard e={example} key="report" />,
     <MissingInfoCard e={example} key="missing" />,
@@ -142,9 +165,11 @@ function ResultsView({ example, layout, showVision, onReset, push }) {
       {/* Left rail: the lens */}
       <aside className="bl-lens">
         <div className="bl-lens-shot">
-          <MockScreen id={example.id} />
+          {shotUrl
+            ? <img style={SHOT_IMG_STYLE} src={shotUrl} alt="Screenshot" />
+            : <MockScreen id={example.id} />}
         </div>
-        <div className="bl-lens-file">{example.captured}</div>
+        <div className="bl-lens-file">{fileName}</div>
         {showVision && (
           <div className="bl-vision">
             <div className="bl-vision-h"><span className="bl-vision-ic">◎</span> What BugLens saw</div>
@@ -190,15 +215,22 @@ function App() {
   const [view, setView] = React.useState("idle"); // idle | loading | results
   const [activeId, setActiveId] = React.useState(null);
   const [report, setReport] = React.useState(null); // structured result from the backend
+  const [shotUrl, setShotUrl] = React.useState(null); // object URL of an uploaded screenshot
+  const [uploadName, setUploadName] = React.useState("");
   const [stageIdx, setStageIdx] = React.useState(0);
   const [toasts, push] = useToasts();
   const timers = React.useRef([]);
   const reqRef = React.useRef(0); // monotonic token so only the latest request wins
 
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
+  const revokeShot = () => { if (shotUrl) URL.revokeObjectURL(shotUrl); };
 
+  // Gallery example: fetched from the mock backend by id.
   const pick = (id) => {
     clearTimers();
+    revokeShot();
+    setShotUrl(null);
+    setUploadName("");
     setActiveId(id);
     setReport(null);
     setStageIdx(0);
@@ -221,9 +253,61 @@ function App() {
     timers.current.push(setTimeout(() => setView("results"), acc + 250));
   };
 
+  // Uploaded screenshot: POSTed to the real backend; results show when it lands.
+  const analyzeUpload = (file) => {
+    if (!file || !file.type || !file.type.startsWith("image/")) {
+      push("Please choose a PNG or JPG screenshot");
+      return;
+    }
+    clearTimers();
+    revokeShot();
+    setShotUrl(URL.createObjectURL(file));
+    setUploadName(file.name);
+    setActiveId(null);
+    setReport(null);
+    setStageIdx(0);
+    setView("loading");
+    const token = ++reqRef.current;
+    // Advance the visual stages but keep the last one active until the result lands.
+    let acc = 0;
+    LOAD_STAGES.forEach((s, i) => {
+      if (i >= LOAD_STAGES.length - 1) return;
+      acc += s.ms;
+      timers.current.push(setTimeout(() => setStageIdx(i + 1), acc));
+    });
+    fileToBase64(file)
+      .then((image_b64) => fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_b64, note: "" }),
+      }))
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          const msg = typeof body.detail === "string" ? body.detail : `Analysis failed (HTTP ${r.status})`;
+          throw new Error(msg);
+        }
+        return r.json();
+      })
+      .then((data) => {
+        if (token !== reqRef.current) return;
+        setStageIdx(LOAD_STAGES.length);
+        setReport(data);
+        setView("results");
+      })
+      .catch((err) => {
+        if (token !== reqRef.current) return;
+        push(err.message || "Analysis failed");
+        reset();
+      });
+  };
+
   const reset = () => {
     clearTimers();
     reqRef.current++; // invalidate any in-flight request
+    revokeShot();
+    setShotUrl(null);
+    setUploadName("");
     setView("idle");
     setActiveId(null);
     setReport(null);
@@ -239,10 +323,16 @@ function App() {
          style={{ "--accent": accent }}>
       <Header onReset={reset} view={view} />
       <div className="bl-stage-wrap">
-        {view === "idle" && <IdleView onPick={pick} />}
-        {view === "loading" && example && <LoadingView example={example} stageIdx={stageIdx} />}
+        {view === "idle" && <IdleView onPick={pick} onUpload={analyzeUpload} />}
+        {view === "loading" && (shotUrl || example) && (
+          <LoadingView shotUrl={shotUrl} mockId={activeId}
+                       fileName={shotUrl ? uploadName : example && example.captured}
+                       stageIdx={stageIdx} />
+        )}
         {view === "results" && report && (
-          <ResultsView example={report} layout={t.cardLayout} showVision={t.showVision}
+          <ResultsView example={report} shotUrl={shotUrl}
+                       fileName={shotUrl ? uploadName : report.captured}
+                       layout={t.cardLayout} showVision={t.showVision}
                        onReset={reset} push={push} />
         )}
       </div>
