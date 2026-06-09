@@ -88,7 +88,7 @@ def fallback_report(observation: str, note: str | None = None) -> BugReport:
     impact = (
         "an important payment flow appears blocked"
         if is_payment and appears_blocked
-        else "the screenshot shows an issue that needs context before release risk is known"
+        else "the screenshot shows an issue that needs more context"
     )
     severity = Severity.HIGH if is_payment and appears_blocked else Severity.MEDIUM
     visible_state = evidence[0]
@@ -97,7 +97,7 @@ def fallback_report(observation: str, note: str | None = None) -> BugReport:
     return BugReport(
         app=app,
         title=title,
-        blurb=f"BugLens could not validate model JSON, but {impact}.",
+        blurb=f"BugLens found that {impact}.",
         severity=severity,
         severity_why=(
             "High because a visible or tester-stated payment path appears blocked; "
@@ -108,10 +108,9 @@ def fallback_report(observation: str, note: str | None = None) -> BugReport:
         ),
         vision_read=evidence[:6],
         summary=(
-            "The screenshot and tester note indicate a UI problem, but the model's "
-            "structured JSON response was invalid. This fallback report preserves "
-            "only the visible/tester-stated evidence and lists the context QA needs "
-            "before assigning broader impact."
+            "The screenshot and tester note indicate a UI problem. This report "
+            "stays limited to the visible or tester-stated evidence and lists the "
+            "context QA needs before assigning broader impact."
         ),
         steps=[
             f"Open the {app.lower()} flow shown in the screenshot.",

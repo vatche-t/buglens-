@@ -64,6 +64,7 @@ def test_fallback_report_preserves_quality_floors_without_overclaiming() -> None
     assert "data loss" not in no_overclaims
     assert "security" not in no_overclaims
     assert "privacy" not in no_overclaims
+    assert "model json" not in f"{report.blurb} {report.summary}".lower()
 
 
 def test_fallback_report_stays_medium_when_impact_is_unclear() -> None:
