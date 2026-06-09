@@ -1,0 +1,2 @@
+"""Structured bug report generation."""
+

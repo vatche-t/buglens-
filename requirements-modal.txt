@@ -1,0 +1,7 @@
+modal==1.4.3
+transformers[torch]==5.10.2
+torchvision
+torchcodec
+pillow==12.2.0
+accelerate
+

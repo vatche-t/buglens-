@@ -1,0 +1,2 @@
+"""Screenshot observation model call."""
+
