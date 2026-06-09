@@ -5,19 +5,24 @@ concurrency) layered on top. We use it to serve the custom `buglens-ui` React
 prototype as the frontend (the Off-Brand path) while exposing the analysis as
 a backend endpoint.
 
-In this step the backend runs in mock mode: it returns the built-in example
-reports. The vision/structuring/Modal pipeline plugs into `analyze()` next.
+Example screenshots are always served from the built-in mock reports (so the
+app is fully explorable without a GPU). Uploaded screenshots are analyzed for
+real by POSTing to the Modal backend when BUGLENS_BACKEND=modal.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 from pathlib import Path
 
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from gradio import Server
+from pydantic import BaseModel
 
+from buglens import backend
 from buglens.config import load_settings
 from buglens.examples import get_example, list_examples
 from buglens.render import (
@@ -63,9 +68,40 @@ def api_examples() -> list[dict]:
 
 @server.get("/api/analyze")
 def api_analyze(id: str | None = None) -> dict:
-    """Return the structured report payload the frontend renders into cards."""
+    """Return a built-in example's report payload (gallery clicks)."""
 
     return analyze(id).to_ui_payload()
+
+
+class AnalyzeUpload(BaseModel):
+    """JSON body for analyzing an uploaded screenshot."""
+
+    image_b64: str
+    note: str = ""
+
+
+@server.post("/api/analyze")
+def api_analyze_upload(payload: AnalyzeUpload) -> dict:
+    """Analyze an uploaded screenshot via the configured inference backend."""
+
+    settings = load_settings()
+    if settings.backend.value != "modal":
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "Live screenshot analysis needs the Modal backend "
+                "(set BUGLENS_BACKEND=modal). Pick an example to preview the app."
+            ),
+        )
+    try:
+        image_bytes = base64.b64decode(payload.image_b64, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise HTTPException(status_code=400, detail="Invalid image data.") from exc
+
+    try:
+        return backend.analyze_via_modal(settings.modal_endpoint, image_bytes, payload.note)
+    except backend.BackendError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @server.get("/api/export/{fmt}")
