@@ -193,6 +193,7 @@ function App() {
   const [stageIdx, setStageIdx] = React.useState(0);
   const [toasts, push] = useToasts();
   const timers = React.useRef([]);
+  const reqRef = React.useRef(0); // monotonic token so only the latest request wins
 
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
 
@@ -202,11 +203,16 @@ function App() {
     setReport(null);
     setStageIdx(0);
     setView("loading");
-    // Ask the backend to analyze (mock mode returns the matching example).
+    // Tag this request; a slower earlier response can't overwrite a newer pick.
+    const token = ++reqRef.current;
     fetch(`/api/analyze?id=${encodeURIComponent(id)}`)
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(setReport)
-      .catch(() => push("Analysis failed — backend unavailable"));
+      .then((data) => { if (token === reqRef.current) setReport(data); })
+      .catch(() => {
+        if (token !== reqRef.current) return;
+        push("Analysis failed — backend unavailable");
+        reset(); // keep view + data in sync instead of an empty results screen
+      });
     let acc = 0;
     LOAD_STAGES.forEach((s, i) => {
       acc += s.ms;
@@ -215,7 +221,13 @@ function App() {
     timers.current.push(setTimeout(() => setView("results"), acc + 250));
   };
 
-  const reset = () => { clearTimers(); setView("idle"); setActiveId(null); setReport(null); };
+  const reset = () => {
+    clearTimers();
+    reqRef.current++; // invalidate any in-flight request
+    setView("idle");
+    setActiveId(null);
+    setReport(null);
+  };
 
   React.useEffect(() => () => clearTimers(), []);
 
