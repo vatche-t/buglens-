@@ -1,40 +1,61 @@
+---
+title: BugLens
+emoji: 🔍
+colorFrom: gray
+colorTo: orange
+sdk: gradio
+sdk_version: 6.17.3
+app_file: app.py
+pinned: false
+license: apache-2.0
+short_description: Turn a bug screenshot into an honest, Jira-ready report.
+tags:
+  - build-small-hackathon
+  - backyard-ai
+  - tiny-titan
+  - off-brand
+  - minicpm-v
+  - openbmb
+  - modal
+  - codex
+---
+
 # BugLens
 
-BugLens turns a screenshot and a one-line tester note into a Jira-ready bug report, a missing-info checklist, regression tests, and edge-case notes.
+BugLens turns a bug screenshot and a one-line tester note into a Jira-ready bug report, a missing-info checklist, regression tests, and edge-case notes — using a ~1.3B vision model that stays honest about what it cannot see.
 
-This repository is currently in planning/scaffold mode. The detailed build plan lives in [`docs/plans`](docs/plans).
+**Build Small Hackathon** · Track: 🏡 Backyard AI · Model: [`openbmb/MiniCPM-V-4.6`](https://huggingface.co/openbmb/MiniCPM-V-4.6) (~1.3B)
 
-## Target
+- 🎥 Demo video: _coming soon_
+- 📣 Social post: _coming soon_
 
-- Hugging Face Build Small Hackathon
-- Track: Backyard AI
-- Primary model: `openbmb/MiniCPM-V-4.6`
-- Core differentiator: honest missing-info reporting instead of guessing unavailable context
+## The idea
 
-## Verified Stack
+QA testers spend real time turning screenshots into structured tickets. BugLens does it in one read — and its differentiator is **honesty**: a small model that refuses to invent context it cannot perceive (browser, OS, device, user role, environment, backend state) and instead hands you a "confirm before filing" checklist.
 
-- Python `>=3.11`
-- Package manager: `uv`
-- Gradio `6.17.3`
-- Pydantic `2.13.4`
-- Pillow `12.2.0`
-- Requests `2.34.2`
-- Optional Modal backend: Modal `1.4.3` + Transformers `5.10.2`
+## How it works (technical approach)
 
-See [`UV.md`](UV.md) for setup and local commands.
+- **Frontend:** a custom React UI served via `gradio.Server` (FastAPI + Gradio's API engine) — deliberately beyond stock Gradio (**Off-Brand**).
+- **Contract:** one validated Pydantic `BugReport` flows through the whole app and serializes to the exact JSON the UI renders into four cards.
+- **Pipeline (two calls):** screenshot → factual UI observation (vision) → strict-JSON structuring → Pydantic validation → cards + Jira / GitHub / CSV exports.
+- **Model:** `openbmb/MiniCPM-V-4.6` (~1.3B, SigLIP2-400M + Qwen3.5-0.8B) — image-native and strong at OCR / UI reading (**Tiny Titan**, **OpenBMB**).
+- **Inference backend:** a Modal GPU endpoint the Space calls over HTTPS (**Modal**); a mock mode keeps the UI fully runnable during development.
 
-## Planned App Flow
+## Run it locally
 
-1. Upload screenshot.
-2. Add tester note.
-3. Generate factual UI observation.
-4. Convert observation into validated bug artifact.
-5. Render four cards:
-   - Bug report
-   - Missing info
-   - Regression tests
-   - Edge cases
-6. Export Jira markdown, GitHub issue markdown, and CSV tests.
+See [`UV.md`](UV.md) for details.
+
+```bash
+uv sync --extra dev
+uv run pytest            # contract, render, and endpoint tests
+uv run python app.py     # serves BugLens on http://localhost:7860
+```
+
+## Verified stack
+
+- Python `>=3.11`, package manager: `uv`
+- Gradio `6.17.3` · Pydantic `2.13.4` · Pillow `12.2.0` · Requests `2.34.2`
+- Modal backend: Modal `1.4.3` + Transformers `5.10.2` (install with `av` instead of `torchcodec` to avoid CUDA conflicts)
 
 ## Plans
 
@@ -44,6 +65,6 @@ See [`UV.md`](UV.md) for setup and local commands.
 - [`04_prompt_schema_quality_plan.md`](docs/plans/04_prompt_schema_quality_plan.md)
 - [`05_submission_readme_demo_social.md`](docs/plans/05_submission_readme_demo_social.md)
 
-## Contribution Strategy
+## Contribution strategy
 
 Codex contribution is part of the submission strategy. See [`docs/CONTRIBUTION_STRATEGY.md`](docs/CONTRIBUTION_STRATEGY.md).
