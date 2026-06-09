@@ -189,6 +189,7 @@ function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [view, setView] = React.useState("idle"); // idle | loading | results
   const [activeId, setActiveId] = React.useState(null);
+  const [report, setReport] = React.useState(null); // structured result from the backend
   const [stageIdx, setStageIdx] = React.useState(0);
   const [toasts, push] = useToasts();
   const timers = React.useRef([]);
@@ -198,8 +199,14 @@ function App() {
   const pick = (id) => {
     clearTimers();
     setActiveId(id);
+    setReport(null);
     setStageIdx(0);
     setView("loading");
+    // Ask the backend to analyze (mock mode returns the matching example).
+    fetch(`/api/analyze?id=${encodeURIComponent(id)}`)
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(setReport)
+      .catch(() => push("Analysis failed — backend unavailable"));
     let acc = 0;
     LOAD_STAGES.forEach((s, i) => {
       acc += s.ms;
@@ -208,7 +215,7 @@ function App() {
     timers.current.push(setTimeout(() => setView("results"), acc + 250));
   };
 
-  const reset = () => { clearTimers(); setView("idle"); setActiveId(null); };
+  const reset = () => { clearTimers(); setView("idle"); setActiveId(null); setReport(null); };
 
   React.useEffect(() => () => clearTimers(), []);
 
@@ -222,8 +229,8 @@ function App() {
       <div className="bl-stage-wrap">
         {view === "idle" && <IdleView onPick={pick} />}
         {view === "loading" && example && <LoadingView example={example} stageIdx={stageIdx} />}
-        {view === "results" && example && (
-          <ResultsView example={example} layout={t.cardLayout} showVision={t.showVision}
+        {view === "results" && report && (
+          <ResultsView example={report} layout={t.cardLayout} showVision={t.showVision}
                        onReset={reset} push={push} />
         )}
       </div>
