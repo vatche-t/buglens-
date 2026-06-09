@@ -221,15 +221,19 @@ function App() {
   const [toasts, push] = useToasts();
   const timers = React.useRef([]);
   const reqRef = React.useRef(0); // monotonic token so only the latest request wins
+  const shotUrlRef = React.useRef(null);
 
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
-  const revokeShot = () => { if (shotUrl) URL.revokeObjectURL(shotUrl); };
+  const clearShot = () => {
+    if (shotUrlRef.current) URL.revokeObjectURL(shotUrlRef.current);
+    shotUrlRef.current = null;
+    setShotUrl(null);
+  };
 
   // Gallery example: fetched from the mock backend by id.
   const pick = (id) => {
     clearTimers();
-    revokeShot();
-    setShotUrl(null);
+    clearShot();
     setUploadName("");
     setActiveId(id);
     setReport(null);
@@ -260,8 +264,10 @@ function App() {
       return;
     }
     clearTimers();
-    revokeShot();
-    setShotUrl(URL.createObjectURL(file));
+    clearShot();
+    const nextShotUrl = URL.createObjectURL(file);
+    shotUrlRef.current = nextShotUrl;
+    setShotUrl(nextShotUrl);
     setUploadName(file.name);
     setActiveId(null);
     setReport(null);
@@ -305,8 +311,7 @@ function App() {
   const reset = () => {
     clearTimers();
     reqRef.current++; // invalidate any in-flight request
-    revokeShot();
-    setShotUrl(null);
+    clearShot();
     setUploadName("");
     setView("idle");
     setActiveId(null);
