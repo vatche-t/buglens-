@@ -1,0 +1,36 @@
+[project]
+name = "buglens"
+version = "0.1.0"
+description = "Small-model QA assistant that turns screenshots into honest bug reports."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "gradio==6.17.3",
+    "pydantic==2.13.4",
+    "pillow==12.2.0",
+    "requests==2.34.2",
+]
+
+[project.optional-dependencies]
+modal = [
+    "modal==1.4.3",
+    "transformers[torch]==5.10.2",
+    "torchvision",
+    "torchcodec",
+    "accelerate",
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.11",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

@@ -11,6 +11,18 @@ This repository is currently in planning/scaffold mode. The detailed build plan 
 - Primary model: `openbmb/MiniCPM-V-4.6`
 - Core differentiator: honest missing-info reporting instead of guessing unavailable context
 
+## Verified Stack
+
+- Python `>=3.11`
+- Package manager: `uv`
+- Gradio `6.17.3`
+- Pydantic `2.13.4`
+- Pillow `12.2.0`
+- Requests `2.34.2`
+- Optional Modal backend: Modal `1.4.3` + Transformers `5.10.2`
+
+See [`UV.md`](UV.md) for setup and local commands.
+
 ## Planned App Flow
 
 1. Upload screenshot.
@@ -32,3 +44,6 @@ This repository is currently in planning/scaffold mode. The detailed build plan 
 - [`04_prompt_schema_quality_plan.md`](docs/plans/04_prompt_schema_quality_plan.md)
 - [`05_submission_readme_demo_social.md`](docs/plans/05_submission_readme_demo_social.md)
 
+## Contribution Strategy
+
+Codex contribution is part of the submission strategy. See [`docs/CONTRIBUTION_STRATEGY.md`](docs/CONTRIBUTION_STRATEGY.md).
