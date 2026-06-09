@@ -66,7 +66,7 @@ class BugLens:
         from fastapi import HTTPException
         from PIL import Image, UnidentifiedImageError
 
-        from buglens.structure import StructureError, structure
+        from buglens.structure import StructureError, fallback_report, structure
         from buglens.vision import observe
 
         try:
@@ -77,14 +77,6 @@ class BugLens:
         observation = observe(self.model, self.processor, screenshot, req.note)
         try:
             report = structure(self.model, self.processor, observation, req.note)
-        except StructureError as exc:
-            # Surface the observation so the UI can still show what was seen.
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "error": "invalid_model_json",
-                    "observation": observation,
-                    "raw": exc.raw,
-                },
-            ) from exc
+        except StructureError:
+            report = fallback_report(observation, req.note)
         return report.to_ui_payload()
