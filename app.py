@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import mimetypes
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -34,6 +35,8 @@ from buglens.schema import BugReport
 
 UI_DIR = Path(__file__).parent / "buglens-ui"
 INDEX_FILE = UI_DIR / "BugLens.html"
+
+mimetypes.add_type("text/babel", ".jsx")
 
 server = Server(title="BugLens")
 
