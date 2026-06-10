@@ -110,4 +110,5 @@ def test_static_assets_served() -> None:
     # The jsx modules referenced by the HTML must be reachable under /static.
     resp = client.get("/static/buglens-data.jsx")
     assert resp.status_code == 200
+    assert "text/babel" in resp.headers["content-type"]
     assert "EXAMPLES" in resp.text
